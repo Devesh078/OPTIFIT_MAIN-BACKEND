@@ -9,93 +9,124 @@ const Workout = require("../models/Workout");
 
 const {
   calculateDailyCalories,
-  calculateProteinTarget
+  calculateProteinTarget,
 } = require("../services/calorieService");
 
-const { calculateWaterGoal } =
-require("../services/waterService");
+const calculateWaterGoal = require("../utils/waterCalculator"); // ✅ Fix 3: correct import
 
 const {
   DEFAULT_STEP_GOAL,
-  calculateStepCalories
+  calculateStepCalories,
 } = require("../services/stepService");
-
 
 const getDashboard = async (req, res) => {
   try {
-
-    const userId = req.user;
+    // ✅ Fix 1: use req.user._id everywhere (protect middleware attaches full user object)
+    const userId = req.user._id;
 
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
 
     // USER
     const user = await User.findById(userId).select("-password");
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // 🔥 AUTO CALCULATED TARGETS
+    // TARGETS
     const calorieData = calculateDailyCalories(user);
+
     const sleepData = await Sleep.findOne({
-  userId,
-  date: today
-});
+      userId,
+      date: { $gte: today, $lte: endOfToday },
+    });
+    const sleepHours = sleepData?.sleepHours || 8;
+    const proteinTarget = calculateProteinTarget(user, sleepHours);
 
-const sleepHours = sleepData?.sleepHours || 8;
-
-const proteinTarget =
-  calculateProteinTarget(user, sleepHours);
-
-    // FOOD TOTALS
-    const foods = await FoodLog.find({ userId, date: today });
-
+    // FOOD
+    const foods = await FoodLog.find({
+      userId,
+      date: { $gte: today, $lte: endOfToday },
+    });
     let consumedCalories = 0;
     let consumedProtein = 0;
-
-    foods.forEach(f => {
+    foods.forEach((f) => {
       consumedCalories += f.calories || 0;
       consumedProtein += f.protein || 0;
     });
 
     // WORKOUT
-    const workouts = await Workout.find({ userId, date: today });
-
+    const workouts = await Workout.find({
+      userId,
+      date: { $gte: today, $lte: endOfToday },
+    });
     let burnedCalories = 0;
-
-    workouts.forEach(w => {
+    workouts.forEach((w) => {
       burnedCalories += w.caloriesBurned || 0;
     });
 
     // STEPS
-    const stepLog = await StepLog.findOne({ userId, date: today });
-
+    const stepLog = await StepLog.findOne({
+      userId,
+      date: { $gte: today, $lte: endOfToday },
+    });
     const steps = stepLog?.steps || 0;
     const stepCalories = calculateStepCalories(steps);
 
-    // WATER
-    const waterLogs = await WaterLog.find({ userId, date: today });
-
-    let waterConsumed = 0;
-
-    waterLogs.forEach(w => {
-      waterConsumed += w.amount;
+    // ✅ Fix 2: WaterLog stores ONE doc per day with totalWater field — read it directly
+    const waterLog = await WaterLog.findOne({
+      userId,
+      date: { $gte: today, $lte: endOfToday },
     });
+    const waterConsumed = waterLog?.totalWater || 0;
 
-    const waterGoal = calculateWaterGoal(user.weight);
+    // ✅ Fix 3: pass full user object (waterCalculator needs weight, activityLevel, age)
+    const waterGoal = calculateWaterGoal(user);
 
-    // SLEEP
-    const sleep = await Sleep.findOne({ userId, date: today });
+    // ✅ Auto-calculate recovery if not exists today
+let recovery = await Recovery.findOne({
+  userId,
+  date: { $gte: today, $lte: endOfToday },
+});
 
-    // RECOVERY
-    const recovery = await Recovery.findOne({ userId, date: today });
+if (!recovery) {
+  const { calculateSleepDebt } = require("../services/sleepService");
+  const { calculateRecoveryScore } = require("../services/recoveryService");
+  const { calculateProteinTarget } = require("../services/calorieService");
+
+  const sleepDebt = await calculateSleepDebt(userId);
+  const proteinTarget = calculateProteinTarget(user, sleepHours);
+  const proteinPercent = proteinTarget > 0
+    ? (consumedProtein / proteinTarget) * 100
+    : 0;
+  const stepPercent = (steps / DEFAULT_STEP_GOAL) * 100;
+
+  const score = calculateRecoveryScore(
+    sleepHours,
+    sleepDebt,
+    proteinPercent,
+    stepPercent
+  );
+
+  recovery = await Recovery.create({
+    userId,
+    date: today,
+    score,
+    sleepHours,
+    sleepDebt,
+  });
+}
 
     // PROTEIN QUALITY
-    const proteinQuality = await ProteinQuality.findOne({ userId, date: today });
+    const proteinQuality = await ProteinQuality.findOne({
+      userId,
+      date: { $gte: today, $lte: endOfToday },
+    });
 
     res.json({
-
       user,
 
       calories: {
@@ -103,49 +134,42 @@ const proteinTarget =
         consumed: consumedCalories,
         burned: burnedCalories + stepCalories,
         remaining:
-          calorieData.finalCalories
-          - consumedCalories
-          + burnedCalories
-          + stepCalories
+          calorieData.finalCalories -
+          consumedCalories +
+          burnedCalories +
+          stepCalories,
       },
 
       protein: {
         target: proteinTarget,
         consumed: consumedProtein,
-        remaining:
-          proteinTarget - consumedProtein
+        remaining: proteinTarget - consumedProtein,
       },
 
       water: {
         goal: waterGoal,
         consumed: waterConsumed,
-        remaining:
-          waterGoal - waterConsumed
+        remaining: waterGoal - waterConsumed,
       },
 
       steps: {
         goal: DEFAULT_STEP_GOAL,
         steps,
         caloriesBurned: stepCalories,
-        remaining:
-          DEFAULT_STEP_GOAL - steps
+        remaining: DEFAULT_STEP_GOAL - steps,
       },
 
-      sleep,
-      recovery,
-      proteinQuality,
+      sleep: sleepData || null,
+      recovery: recovery || null,
+      proteinQuality: proteinQuality || null,
 
       workout: {
-        caloriesBurned: burnedCalories
-      }
-
+        caloriesBurned: burnedCalories,
+      },
     });
-
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      message: "Server error"
-    });
+    console.error("getDashboard error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 

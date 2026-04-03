@@ -9,7 +9,8 @@ require("../middleware/authMiddleware");
 
 const {
   logSteps,
-  getStepSummary
+  getStepSummary,
+  getWeeklySteps
 }
 =
 require("../controllers/stepController");
@@ -25,6 +26,12 @@ router.get(
 "/summary",
 authMiddleware,
 getStepSummary
+);
+
+router.get
+("/weekly", 
+authMiddleware,
+getWeeklySteps
 );
 
 module.exports = router;

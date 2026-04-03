@@ -1,18 +1,17 @@
 const express = require("express");
-
 const router = express.Router();
-
-const authMiddleware =
-require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 const {
-  logWater,
-  getWaterSummary
+  getTodayWater,
+  addWater,
+  setReminder
 } = require("../controllers/waterController");
 
+router.use(protect);
 
-router.post("/log", authMiddleware, logWater);
-
-router.get("/summary", authMiddleware, getWaterSummary);
+router.get("/today", getTodayWater);
+router.post("/add", addWater);
+router.post("/reminder", setReminder);
 
 module.exports = router;
