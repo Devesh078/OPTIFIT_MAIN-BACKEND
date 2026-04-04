@@ -3,9 +3,10 @@ const calculateWaterGoal = require("../utils/waterCalculator");
 
 // Helper: today's date (start of day)
 const getToday = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  ist.setHours(0, 0, 0, 0);
+  return ist;
 };
 
 // ==========================
@@ -65,7 +66,8 @@ exports.addWater = async (req, res) => {
       amount,
       time: new Date().toLocaleTimeString([], {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
+        timeZone: "Asia/Kolkata"  // ✅ IST timezone
       })
     };
 
