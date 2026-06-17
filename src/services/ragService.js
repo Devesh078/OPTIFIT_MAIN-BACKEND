@@ -463,9 +463,21 @@ const getDayProgress = () => {
 const getDayStage = () => {
   const hour = new Date().getHours();
 
-  if (hour < 12) return "Morning";
-  if (hour < 17) return "Afternoon";
-  if (hour < 21) return "Evening";
+  if (hour >= 0 && hour < 5) {
+    return "Late Night";
+  }
+
+  if (hour >= 5 && hour < 12) {
+    return "Morning";
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return "Afternoon";
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return "Evening";
+  }
 
   return "Night";
 };
@@ -475,11 +487,24 @@ const getDayStage = () => {
  */
 const getTimeContext = () => {
   const hour = new Date().getHours();
-  if (hour < 6)  return "late night / early morning";
-  if (hour < 12) return "morning";
-  if (hour < 17) return "afternoon";
-  if (hour < 21) return "evening";
-  return "late evening / night";
+
+  if (hour >= 0 && hour < 5) {
+    return "Late Night";
+  }
+
+  if (hour >= 5 && hour < 12) {
+    return "Morning";
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return "Afternoon";
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return "Evening";
+  }
+
+  return "Night";
 };
 
 // ─────────────────────────────────────────────
@@ -571,7 +596,11 @@ const buildContextBlock = (context, nutrition, extras = {}) => {
 
   return `
 ## ${p.name}'s Live Fitness Data
-- Current Day Stage: ${getDayStage()}
+- Current Time Context: ${getTimeContext()}
+- Current Local Time: ${new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  })}
 - Goal: ${p.goal}
 - Weight: ${p.weight} kg
 - Recovery Score: ${s.recoveryScore ?? "N/A"} / 100
@@ -621,6 +650,10 @@ Time-awareness rules (critical):
   (e.g. whey shake, Greek yogurt, paneer, egg whites, chicken breast)
 - If it's late night with a large gap remaining: be honest that today may not be fully recoverable,
   and focus on setting up tomorrow instead
+- 12:00 AM–4:59 AM = Late Night
+- Never refer to this period as morning
+- If the user asks for food during Late Night, suggest snacks, recovery foods, or protein options
+- Do not suggest breakfast, lunch, or "start your day" during Late Night
 
 When the user's common foods are available:
 - Recommend ONLY foods from that list, with real gram amounts
@@ -628,6 +661,43 @@ When the user's common foods are available:
   • 2 scoops whey = 50g
   • 200g paneer = 36g
   Never invent foods the user hasn't logged before.
+Food Recommendation Rules:
+
+- If the user asks for a snack, meal, craving, dessert, cheat meal, or food recommendation:
+  Answer the food request first.
+
+- Think like a human coach, not a nutrition calculator.
+
+- Consider:
+  • Time of day
+  • Cravings
+  • Practicality
+  • Recovery goals
+
+- For late-night snack requests:
+  Suggest realistic snacks people actually eat.
+
+Examples:
+- Popcorn
+- Greek yogurt with fruit
+- Peanut butter toast
+- Dark chocolate + nuts
+- Roasted makhana
+- Protein pudding
+- Fruit bowl
+- Cottage cheese with berries
+
+- Do not immediately recommend whey protein, chicken breast, egg whites, or meal-prep foods unless the user specifically asks for high-protein options.
+Question Priority Rules:
+
+- First answer the user's question directly.
+- Then use fitness data to personalize the answer.
+- Never ignore the user's requested food, workout, recovery, or nutrition topic.
+- If the user asks for a meal, snack, recipe, food suggestion, or food recommendation:
+  1. Recommend foods first.
+  2. Then connect the recommendation to their protein goal, recovery score, sleep, or other metrics.
+- Do not turn every nutrition question into a protein-target discussion.
+
 
 Tone example (aim for this voice):
 "Hey Rahul — you've hit 27g of your 143g target and it's already 9pm.
@@ -683,6 +753,13 @@ Cover in order:
 2. Factor in the time of day — is this gap still recoverable or is it late?
 3. Specific food recommendations using the user's known foods if available, with gram amounts
 4. A one-line verdict
+5. Answer the food question first.
+6. Give 2-4 specific food options.
+7. Then connect those options to their protein target.
+8. Mention remaining protein only if relevant.
+
+If the user is asking about protein goals, macros, or nutrition planning:
+Follow the normal nutrition workflow.
 `.trim(),
 
   workout: `
