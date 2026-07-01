@@ -443,69 +443,56 @@ const DEBUG = process.env.NODE_ENV !== "production";
 const log = (...args) => { if (DEBUG) console.log(...args); };
 
 // ─────────────────────────────────────────────
-// Time awareness helpers
+// Timezone-aware time helpers (IST = UTC+5:30)
+// Uses pure UTC math — no locale/ICU dependency
+// Works reliably on all cloud servers (Render, Railway, etc.)
 // ─────────────────────────────────────────────
 
-/**
- * Returns how much of the day has passed as a fraction (0.0 → 1.0).
- * 6 AM = 0.25, 12 PM = 0.5, 6 PM = 0.75, 10 PM = 0.92
- */
-const getDayProgress = () => {
+const getISTMinutesSinceMidnight = () => {
   const now = new Date();
-  const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
-  return minutesSinceMidnight / 1440; // 1440 = minutes in a day
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return (utcMinutes + 330) % 1440; // 330 = IST offset in minutes (5h 30m)
+};
+
+const getISTHour = () => {
+  return Math.floor(getISTMinutesSinceMidnight() / 60);
+};
+
+const getISTTimeString = () => {
+  const totalMinutes = getISTMinutesSinceMidnight();
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const displayHour = hours % 12 === 0 ? 12 : hours % 12;
+  const displayMin = minutes.toString().padStart(2, "0");
+  return `${displayHour}:${displayMin} ${ampm}`;
 };
 
 /**
- * Estimates how many eating opportunities remain in the day.
- * Assumes meals at roughly 8am, 1pm, 4pm, 8pm.
+ * Returns how much of the day has passed as a fraction (0.0 → 1.0).
+ * 6 AM IST = 0.25, 12 PM IST = 0.5, 6 PM IST = 0.75, 10 PM IST = 0.92
+ */
+const getDayProgress = () => {
+  return getISTMinutesSinceMidnight() / 1440;
+};
+
+/**
+ * Returns the current day stage based on IST hour.
  */
 const getDayStage = () => {
-  const hour = new Date().getHours();
+  const hour = getISTHour();
 
-  if (hour >= 0 && hour < 5) {
-    return "Late Night";
-  }
-
-  if (hour >= 5 && hour < 12) {
-    return "Morning";
-  }
-
-  if (hour >= 12 && hour < 17) {
-    return "Afternoon";
-  }
-
-  if (hour >= 17 && hour < 21) {
-    return "Evening";
-  }
-
+  if (hour >= 0 && hour < 5)  return "Late Night";
+  if (hour >= 5 && hour < 12) return "Morning";
+  if (hour >= 12 && hour < 17) return "Afternoon";
+  if (hour >= 17 && hour < 21) return "Evening";
   return "Night";
 };
 
 /**
  * Returns a human-readable time context label for the prompt.
  */
-const getTimeContext = () => {
-  const hour = new Date().getHours();
-
-  if (hour >= 0 && hour < 5) {
-    return "Late Night";
-  }
-
-  if (hour >= 5 && hour < 12) {
-    return "Morning";
-  }
-
-  if (hour >= 12 && hour < 17) {
-    return "Afternoon";
-  }
-
-  if (hour >= 17 && hour < 21) {
-    return "Evening";
-  }
-
-  return "Night";
-};
+const getTimeContext = () => getDayStage();
 
 // ─────────────────────────────────────────────
 // Pre-calculated nutrition intelligence
@@ -581,7 +568,6 @@ Reply with ONLY the single category word. No explanation. No punctuation.
 const buildContextBlock = (context, nutrition, extras = {}) => {
   const p = context.profile;
   const s = context.summary;
-  const now = new Date();
 
   // Build the user's known foods block (if available)
   const knownFoodsBlock = p.commonFoods?.length
@@ -597,10 +583,7 @@ const buildContextBlock = (context, nutrition, extras = {}) => {
   return `
 ## ${p.name}'s Live Fitness Data
 - Current Time Context: ${getTimeContext()}
-- Current Local Time: ${new Date().toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  })}
+- Current Local Time (IST): ${getISTTimeString()}
 - Goal: ${p.goal}
 - Weight: ${p.weight} kg
 - Recovery Score: ${s.recoveryScore ?? "N/A"} / 100
@@ -817,7 +800,6 @@ Rules:
 - Stay under 130 words.
 - End with one short motivational sentence.
 `.trim();
-
 };
 
 
