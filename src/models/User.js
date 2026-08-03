@@ -12,30 +12,40 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      lowercase: true
+      lowercase: true,
+      trim: true
     },
 
     password: {
       type: String,
-      required: true
+      required: function () {
+        return !this.googleId; // password not required for Google users
+      }
     },
+
+    googleId: {
+      type: String,
+      default: null
+    },
+
     gender: {
       type: String,
       enum: ["male", "female"],
       required: true
     },
+
     age: {
       type: Number,
       required: true
     },
 
     height: {
-      type: Number, // in cm
+      type: Number,
       required: true
     },
 
     weight: {
-      type: Number, // in kg
+      type: Number,
       required: true
     },
 
@@ -49,6 +59,33 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["sedentary", "moderate", "active"],
       default: "moderate"
+    },
+
+    // ── Email Verification ──
+    isEmailVerified: {
+      type: Boolean,
+      default: false
+    },
+
+    emailVerificationOTP: {
+      type: String,
+      default: null
+    },
+
+    emailVerificationOTPExpiry: {
+      type: Date,
+      default: null
+    },
+
+    // ── Forgot Password ──
+    resetPasswordOTP: {
+      type: String,
+      default: null
+    },
+
+    resetPasswordOTPExpiry: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "nutrition-001",
+    "category": "nutrition",
+    "title": "Daily Protein Intake",
+    "content": "For muscle growth, consuming 1.6 to 2.2 grams of protein per kilogram of body weight supports muscle protein synthesis."
+  },
+  {
+    "id": "nutrition-002",
+    "category": "nutrition",
+    "title": "Protein Distribution",
+    "content": "Distribute protein evenly across meals rather than consuming it all at once."
+  }
+]

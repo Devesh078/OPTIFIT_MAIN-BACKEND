@@ -1,5 +1,5 @@
 const axios = require("axios");
-
+const { getDefaultUnit } = require("./foodUnits");
 
 // =========================
 // SEARCH FOOD (for dropdown / suggestions)
@@ -17,14 +17,17 @@ const searchFood = async (query) => {
       }
     );
 
-    return response.data;
+    const resultsWithUnits = response.data.results.map((item) => ({
+      ...item,
+      defaultUnit: getDefaultUnit(item.name)
+    }));
 
+    return { ...response.data, results: resultsWithUnits };
   } catch (error) {
     console.log("SEARCH ERROR:", error.message);
     throw error;
   }
 };
-
 
 // =========================
 // GET NUTRITION (SMART MATCH)

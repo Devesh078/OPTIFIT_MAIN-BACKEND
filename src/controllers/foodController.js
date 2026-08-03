@@ -200,10 +200,13 @@ const unitMap = {
   g: 1,
   gram: 1,
   kg: 1000,
+  ml: 1,
+  l: 1000,
+  L: 1000,    // ← add uppercase L
   cup: 200,
   piece: 50,
   tbsp: 15,
-  tsp: 5
+  tsp: 5,
 };
 
 // =========================
